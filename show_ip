@@ -1,0 +1,52 @@
+blink() {
+    # get the IP of the exit interface
+    ip=`ip route get 8.8.8.8 | awk 'NR==1 {print $NF}'`
+    echo $ip
+    cnt=${#ip}
+
+    # stop status LED blinking 
+    echo none | sudo tee /sys/class/leds/chip\:white\:status/trigger > /dev/null
+
+    for ((i=0;i<cnt;i++))
+    do
+        # get one character at time
+        c=${ip:i:1}
+        # if the character is not a point
+        if [ $c != "." ] 
+        then
+            # if the character is not a zero
+            if [ $c != "0" ]
+            then
+                # blinks as many times as the number
+                for ((j=0;j<c;++j))
+                do
+                    echo "."
+                    sudo i2cset -f -y 0 0x34 0x93 0x1
+                    sleep 0.3 
+                    sudo i2cset -f -y 0 0x34 0x93 0x0
+                done
+            else
+                # it is a zero. Sets a "long" blink
+                echo "-"
+                sudo i2cset -f -y 0 0x34 0x93 0x1
+                sleep 2 
+                sudo i2cset -f -y 0 0x34 0x93 0x0
+            fi
+            # pause between each number
+            echo " "
+            sleep 1
+        else
+            # pause between each octet
+            echo "point"
+            sleep 3
+        fi
+    done
+    # restore the status LED behavior (other option: heartbeat)
+    echo nand-disk | sudo tee /sys/class/leds/chip\:white\:status/trigger > /dev/null
+}
+
+case $reason in
+        BOUND|RENEW|REBIND|REBOOT)
+            blink
+            ;;
+esac
